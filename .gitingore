@@ -1,1 +1,10 @@
+
+# ignore the data sets
 **/data/
+
+# Notebooks
+**/.ipynb_checkpoints
+
+# IPython
+**/profile_default/
+**/ipython_config.py
