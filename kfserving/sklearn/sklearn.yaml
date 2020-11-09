@@ -1,0 +1,13 @@
+apiVersion: serving.kubeflow.org/v1alpha2
+kind: InferenceService
+metadata:
+  annotations:
+    sidecar.istio.io/inject: 'false'
+  labels:
+    controller-tools.k8s.io: '1.0'
+  name: sklearn-iris
+spec:
+  default:
+    predictor:
+      sklearn:
+        storageUri: "gs://kfserving-model-examples/sklearn/"
