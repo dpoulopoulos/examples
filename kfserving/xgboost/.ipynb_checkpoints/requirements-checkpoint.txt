@@ -1,2 +1,0 @@
-scikit-learn
-xgboost==0.90
