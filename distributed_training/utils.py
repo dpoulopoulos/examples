@@ -36,10 +36,18 @@ def get_data(args, distribute: str = False, rank: int = 0):
                           train=True,
                           transform=_transforms,
                           download=True)
+
+    test_dataset = MNIST('data', train=False, transform=_transforms)
+
     if distribute:
         train_sampler = DistributedSampler(train_dataset,
                                            num_replicas=args.world_size,
                                            rank=rank)
-        return create_loader(train_dataset, args.batch, train_sampler)
+        test_sampler = DistributedSampler(test_dataset,
+                                           num_replicas=args.world_size,
+                                           rank=rank)
 
-    return create_loader(train_dataset, args.batch)
+        return create_loader(train_dataset, args.batch, train_sampler), \
+               create_loader(test_dataset, args.batch, test_sampler)
+
+    return create_loader(train_dataset, args.batch), create_loader(test_dataset, args.batch)

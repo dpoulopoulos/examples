@@ -6,6 +6,7 @@ from datetime import datetime
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
@@ -91,7 +92,7 @@ def ddp_train(gpu, args):
     optimizer = torch.optim.SGD(model.parameters(), lr)
 
     # data loading
-    train_loader = get_data(args, distribute=True, rank=rank)
+    train_loader, test_loader = get_data(args, distribute=True, rank=rank)
     total_step = len(train_loader)
 
     # training loop
@@ -114,7 +115,35 @@ def ddp_train(gpu, args):
                 print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, args.epochs, i + 1, total_step,
                                                                          loss.item()))
     if gpu == 0:
-        print("Training complete in: " + str(datetime.now() - start))
+        print("Training completed in: " + str(datetime.now() - start))
+        
+    # evaluation loop
+    start = datetime.now()
+        
+    total = 0
+    test_loss = 0
+    correct = 0
+    model.eval()
+
+    with torch.no_grad():
+        for i, (images, labels) in enumerate(train_loader):
+            images = images.cuda(non_blocking=True)
+            labels = labels.cuda(non_blocking=True)
+
+            outputs = model(images)
+            test_loss += F.nll_loss(outputs, labels, reduction='sum').item() 
+            pred = outputs.argmax(dim=1, keepdim=True)
+            total += labels.size(0)
+            correct += pred.eq(labels.view_as(pred)).sum().item()
+            
+    test_loss /= total
+
+    if gpu == 0:
+        print(f"Test set: Average loss: {test_loss:.4f},"
+              f" Accuracy: {correct}/{total}"
+              f" ({100. * correct / total:.0f}%)")
+        
+        logging.info("Evaluation completed in: " + str(datetime.now() - start))
 
     dist.destroy_process_group()
 
@@ -140,7 +169,7 @@ def train(args, distribute=False):
     optimizer = torch.optim.SGD(model.parameters(), lr)
 
     # data loading
-    train_loader = get_data(args)
+    train_loader, test_loader = get_data(args)
     total_step = len(train_loader)
 
     # training loop
@@ -163,7 +192,34 @@ def train(args, distribute=False):
                 print('Epoch [{}/{}], Step [{}/{}], Loss: {:.4f}'.format(epoch + 1, args.epochs, i + 1, total_step,
                                                                          loss.item()))
 
-    print("Training complete in: " + str(datetime.now() - start))
+    logging.info("Training completed in: " + str(datetime.now() - start))
+    
+    # evaluation loop
+    start = datetime.now()
+        
+    total = 0
+    test_loss = 0
+    correct = 0
+    model.eval()
+
+    with torch.no_grad():
+        for i, (images, labels) in enumerate(train_loader):
+            images = images.cuda()
+            labels = labels.cuda()
+
+            outputs = model(images)
+            test_loss += F.nll_loss(outputs, labels, reduction='sum').item() 
+            pred = outputs.argmax(dim=1, keepdim=True)
+            total += labels.size(0)
+            correct += pred.eq(labels.view_as(pred)).sum().item()
+            
+    test_loss /= total
+
+    print(f"Test set: Average loss: {test_loss:.4f},"
+          f" Accuracy: {correct}/{total}"
+          f" ({100. * correct / total:.0f}%)")
+    
+    logging.info("Evaluation completed in: " + str(datetime.now() - start))
 
 
 if __name__ == '__main__':
