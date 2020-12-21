@@ -1,12 +1,15 @@
 
 # ignore the data sets
-**/data/
+**/data
+
+# Python
+**/__pycache__
 
 # Notebooks
-**/.ipynb_checkpoints/
+**/.ipynb_checkpoints
 
 # IPython
-**/profile_default/
+**/profile_default
 **/ipython_config.py
 
 # Logs
