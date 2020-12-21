@@ -1,6 +1,7 @@
 
-# ignore the data sets
+# ignore data and logs 
 **/data
+**/logs
 
 # Python
 **/__pycache__
