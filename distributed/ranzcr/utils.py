@@ -9,21 +9,20 @@ from torch.utils.data import DataLoader
 from torch.nn.parallel import DistributedDataParallel as DDP
 from tensorboardX import SummaryWriter
 
-from .net import ResNext
-from .data import get_data
+from net import ResNext
+from data import get_data
 
 
-def train(gpu: int, writer: SummaryWriter, args: Namespace):
+def train(gpu: int, args: Namespace):
     """Implements the training loop for PyTorch a model.
 
     Args:
         gpu: the GPU device
-        writer: TensorBoard logging
         args: user defined arguments
     """
 
     # define the hyperameters
-    BATCH_SIZE = args.batch
+    BATCH_SIZE = args.batch_size
     LR = args.lr
     EPOCHS = args.epochs
 
@@ -41,7 +40,7 @@ def train(gpu: int, writer: SummaryWriter, args: Namespace):
     model = DDP(model, device_ids=[gpu])
 
     # define loss function (criterion) and optimizer
-    criterion = nn.CrossEntropyLoss().cuda(gpu)
+    criterion = nn.BCEWithLogitsLoss().cuda()
     optimizer = Adam(model.parameters(), LR)
 
     # data loading
@@ -58,12 +57,15 @@ def train(gpu: int, writer: SummaryWriter, args: Namespace):
             optimizer.step()
             optimizer.zero_grad()
 
-            if i % args.log_interval == 0:
+            if i % args.log_interval == 0 and gpu ==0:
                 print("Train Epoch: {} [{}/{} ({:.0f}%)]\tloss={:.4f}".format(
-                    epoch, i * len(images), len(train_loader.dataset),
+                    epoch+1, i, len(train_loader),
                     100. * i / len(train_loader), loss.item()))
-                n_iter = epoch * len(train_loader) + i
-                writer.add_scalar('loss', loss.item(), n_iter)
+                
+    if args.save_model and gpu == 0:
+        torch.save(model.state_dict(), "model.pt")
+        
+    dist.destroy_process_group()
 
 
 # def test(args: Namespace, model: nn.Module,

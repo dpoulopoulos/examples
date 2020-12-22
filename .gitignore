@@ -13,5 +13,8 @@
 **/profile_default
 **/ipython_config.py
 
+# PyTorch
+**/*.pt
+
 # Logs
 *.log

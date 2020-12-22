@@ -39,7 +39,7 @@ class RanzcrDataset(Dataset):
     
 
 def get_data(args, rank):
-    _transforms = transforms.Compose([transforms.RandomResizedCrop(512),
+    _transforms = transforms.Compose([transforms.RandomResizedCrop(args.image_size),
                                       transforms.ToTensor(),
                                       transforms.Normalize((0.1307,), (0.3081,))
                                      ])
