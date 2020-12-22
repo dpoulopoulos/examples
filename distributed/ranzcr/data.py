@@ -47,8 +47,8 @@ def get_data(args, df, fold, rank):
     valid_folds = df.loc[val_idx].reset_index(drop=True)
 
     _transforms = transforms.Compose([transforms.RandomResizedCrop(args.image_size),
-                                    transforms.ToTensor(),
-                                    transforms.Normalize((0.1307,), (0.3081,))
+                                      transforms.ToTensor(),
+                                      transforms.Normalize((0.1307,), (0.3081,))
                                     ])
 
     train_dataset = RanzcrDataset(train_folds, _transforms)
@@ -63,11 +63,11 @@ def get_data(args, df, fold, rank):
 
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size,
                                   shuffle=False, num_workers=0,
-                                  pin_memory=True, sampler=train_sampler)
+                                  pin_memory=False, sampler=train_sampler)
 
     valid_dataloader = DataLoader(valid_dataset, batch_size=args.batch_size,
                                   shuffle=False, num_workers=0,
-                                  pin_memory=True, sampler=valid_sampler)
+                                  pin_memory=False, sampler=valid_sampler)
     
     return train_dataloader, valid_dataloader
 

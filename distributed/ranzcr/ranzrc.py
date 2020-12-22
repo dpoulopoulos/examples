@@ -7,7 +7,7 @@ import torch.multiprocessing as mp
 
 from tensorboardX import SummaryWriter
 
-from utils import train
+from training import train
 
 
 def main():
@@ -29,8 +29,8 @@ def main():
                         help='disables CUDA training (default False)')
     parser.add_argument('--seed', type=int, default=1,
                         help='random seed (default: 1)')
-    parser.add_argument('--log-interval', type=int, default=10,
-                        help='how many batches to wait before logging training status (default 10)')
+    parser.add_argument('--log-interval', type=int, default=5,
+                        help='how many batches to wait before logging training status (default 5)')
     parser.add_argument('--save-model', type=bool, default=True,
                         help='for saving the current model (default false)')
     parser.add_argument('--dir', default='logs',
@@ -57,6 +57,7 @@ def main():
         print("Using CUDA")
 
     if dist.is_available():
+        args.world_size = args.gpus * args.nodes
         mp.spawn(train, nprocs=args.gpus, args=(args,))
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@
 
 # PyTorch
 **/*.pt
+**/*.checkpoint
 
 # Logs
 *.log

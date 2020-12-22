@@ -40,15 +40,23 @@ def train(gpu: int, args: Namespace):
     # split data
     train_df = split_data(args.folds)
 
-    for fold in range (args.folds):
+    for fold in range(args.folds):
+        losses = []
+        scores = []
         train_loader, valid_loader = get_data(args, train_df, fold, rank)
+        
+        # checkpoint model
+        model = checkpoint(model, gpu)
+        
+        if gpu == 0:
+            print(f"Training started using fold {fold} for validation") 
+        
+        # train
+        model.train()
         for epoch in range(args.epochs):
-            # checkpoint model
-            model = checkpoint(model, gpu)
-            model.train()
             for i, (images, labels) in enumerate(train_loader):
-                images = images.cuda(non_blocking=True)
-                labels = labels.cuda(non_blocking=True)
+                images = images.cuda(gpu)
+                labels = labels.cuda(gpu)
                 output = model(images)
                 loss = criterion(output, labels)
                 loss.backward()
@@ -57,35 +65,31 @@ def train(gpu: int, args: Namespace):
 
                 if i % args.log_interval == 0 and gpu ==0:
                     print("Train Epoch: {} [{}/{} ({:.0f}%)]\tloss={:.4f}".format(
-                        epoch+1, i, len(train_loader),
-                        100. * i / len(train_loader), loss.item()))
+                          epoch+1, i, len(train_loader),
+                          100. * i / len(train_loader), loss.item()))
+        
+        # evaluate
+        model.eval()
+        with torch.no_grad():
+            for i, (images, labels) in enumerate(valid_loader):
+                images = images.cuda(gpu)
+                labels = labels.cuda(gpu)
+                output = model(images)
+                loss = criterion(output, labels).item()
+                score = get_score(labels.detach().cpu(), output.detach().cpu())
+                losses.append(loss)
+                scores.append(score)
 
-                    valid_loss, score = evaluate(model, valid_loader, criterion)
-                    print(f"Test loss: {valid_loss:.4f}\tAUC score: {score:.4f}")
-                
+            if gpu == 0:
+                print("Validation loss={:.4f}\tAUC score={:.4f}".format(
+                      statistics.mean(losses), statistics.mean(scores)))
+            
     if args.save_model and gpu == 0:
         torch.save(model.state_dict(), "model.pt")
         
     cleanup()
 
-
-def evaluate(model, valid_loader, criterion):
-    losses = []
-    scores = []
-
-    model.eval()
-    with torch.no_grad():
-        for images, labels in valid_loader:
-            images = images.cuda(non_blocking=True)
-            labels = labels.cuda(non_blocking=True)
-            output = model(images)
-            loss = criterion(output, labels).item()
-            score = get_score(labels.detach().cpu(), output.detach().cpu())
-            losses.append(loss)
-            scores.append(score)
     
-    return statistics.mean(losses), statistics.mean(scores)
-
 # def test(args: Namespace, model: nn.Module):
 #     """Implements the evaluation loop for a PyTorch model.
 

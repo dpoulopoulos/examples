@@ -16,11 +16,10 @@ def setup(rank: int, args: Namespace):
     os.environ['MASTER_PORT'] = args.port
 
     # initialize the process group
-    world_size = args.gpus * args.nodes
     dist.init_process_group(backend=args.backend, 
                             init_method='env://', 
                             rank=rank, 
-                            world_size=world_size)
+                            world_size=args.world_size)
 
 
 def cleanup():
