@@ -21,6 +21,8 @@ def main():
                         help='number of epochs to train (default: 10)')
     parser.add_argument('--lr', type=float, default=0.01,
                         help='learning rate (default: 0.01)')
+    parser.add_argument('--folds', type=int, default=5,
+                        help='number of folds for KFold validation (default: 5)')
     parser.add_argument('--image-size', type=int, default=224,
                         help='the size of the image (default: 224)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -49,16 +51,12 @@ def main():
                             help='master port')
     args = parser.parse_args()
 
-    use_cuda = not args.no_cuda and torch.cuda.is_available()
-    if use_cuda:
-        print("Using CUDA")
-
     torch.manual_seed(args.seed)
 
+    if not args.no_cuda and torch.cuda.is_available():
+        print("Using CUDA")
+
     if dist.is_available():
-        os.environ['MASTER_ADDR'] = args.host
-        os.environ['MASTER_PORT'] = args.port
-        args.world_size = args.gpus * args.nodes
         mp.spawn(train, nprocs=args.gpus, args=(args,))
 
 if __name__ == "__main__":

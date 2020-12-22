@@ -1,94 +1,49 @@
+import os
+
 from argparse import Namespace
 
 import torch
-import torch.nn as nn
 import torch.distributed as dist
 
-from torch.optim import Adam
-from torch.utils.data import DataLoader
-from torch.nn.parallel import DistributedDataParallel as DDP
-from tensorboardX import SummaryWriter
-
-from net import ResNext
-from data import get_data
+from sklearn.metrics import roc_auc_score
 
 
-def train(gpu: int, args: Namespace):
-    """Implements the training loop for PyTorch a model.
+CHECKPOINT_PATH = "model.checkpoint"
 
-    Args:
-        gpu: the GPU device
-        args: user defined arguments
-    """
 
-    # define the hyperameters
-    BATCH_SIZE = args.batch_size
-    LR = args.lr
-    EPOCHS = args.epochs
+def setup(rank: int, args: Namespace):
+    os.environ['MASTER_ADDR'] = args.host
+    os.environ['MASTER_PORT'] = args.port
 
-    # setup process groups
-    rank = args.nr * args.gpus + gpu
-    dist.init_process_group(backend=args.backend, init_method='env://',
-                            world_size=args.world_size, rank=rank)
-    
-    # define the model
-    torch.cuda.set_device(gpu)
+    # initialize the process group
+    world_size = args.gpus * args.nodes
+    dist.init_process_group(backend=args.backend, 
+                            init_method='env://', 
+                            rank=rank, 
+                            world_size=world_size)
 
-    model = ResNext()
-    model.cuda(gpu)
-    # Wrap the model
-    model = DDP(model, device_ids=[gpu])
 
-    # define loss function (criterion) and optimizer
-    criterion = nn.BCEWithLogitsLoss().cuda()
-    optimizer = Adam(model.parameters(), LR)
-
-    # data loading
-    train_loader = get_data(args, rank=rank)
-
-    model.train()
-    for epoch in range(args.epochs):
-        for i, (images, labels) in enumerate(train_loader):
-            images = images.cuda(non_blocking=True)
-            labels = labels.cuda(non_blocking=True)
-            output = model(images)
-            loss = criterion(output, labels)
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-
-            if i % args.log_interval == 0 and gpu ==0:
-                print("Train Epoch: {} [{}/{} ({:.0f}%)]\tloss={:.4f}".format(
-                    epoch+1, i, len(train_loader),
-                    100. * i / len(train_loader), loss.item()))
-                
-    if args.save_model and gpu == 0:
-        torch.save(model.state_dict(), "model.pt")
-        
+def cleanup():
     dist.destroy_process_group()
 
 
-# def test(args: Namespace, model: nn.Module,
-#          device: str, test_loader: DataLoader, 
-#          loss_fn: nn.Module, epoch: int,
-#          writer: SummaryWriter):
-#     """Implements the evaluation loop for a PyTorch model.
+def checkpoint(model, gpu):
+    if gpu == 0:
+        # All processes should see same parameters as they all start from same
+        # random parameters and gradients are synchronized in backward passes.
+        # Therefore, saving it in one process is sufficient.
+        torch.save(model.state_dict(), CHECKPOINT_PATH)
 
-#     Args:
-#         gpu: the GPU device
-#         args: user defined arguments
-#     """
-#     model.eval()
-#     test_loss = 0
-#     correct = 0
-#     with torch.no_grad():
-#         for data, target in test_loader:
-#             data, target = data.to(device), target.to(device)
-#             output = model(data)
-#             test_loss += loss_fn(output, target, reduction='sum').item() # sum up batch loss
-#             pred = output.max(1, keepdim=True)[1] # get the index of the max log-probability
-#             correct += pred.eq(target.view_as(pred)).sum().item()
+    # use a barrier() to make sure that process 1 loads the model after process
+    # 0 saves it.
+    dist.barrier()
+    # configure map_location properly
+    map_location = {'cuda:%d' % 0: 'cuda:%d' % gpu}
+    model.load_state_dict(
+        torch.load(CHECKPOINT_PATH, map_location=map_location))
 
-#     test_loss /= len(test_loader.dataset)
-#     print("\naccuracy={:.4f}\n".format(float(correct) / len(test_loader.dataset)))
-#     writer.add_scalar('accuracy', float(correct) / len(test_loader.dataset), epoch)
+    return model
+
+
+def get_score(labels, predictions):
+    return roc_auc_score(labels.reshape(-1), predictions.reshape(-1))
