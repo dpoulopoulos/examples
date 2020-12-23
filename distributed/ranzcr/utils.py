@@ -26,20 +26,20 @@ def cleanup():
     dist.destroy_process_group()
 
 
-def checkpoint(model, gpu):
+def checkpoint(model, gpu, fold):
     if gpu == 0:
         # All processes should see same parameters as they all start from same
         # random parameters and gradients are synchronized in backward passes.
         # Therefore, saving it in one process is sufficient.
-        torch.save(model.state_dict(), CHECKPOINT_PATH)
+        torch.save(model.module.state_dict(), CHECKPOINT_PATH + f"_{fold}")
 
     # use a barrier() to make sure that process 1 loads the model after process
     # 0 saves it.
     dist.barrier()
     # configure map_location properly
     map_location = {'cuda:%d' % 0: 'cuda:%d' % gpu}
-    model.load_state_dict(
-        torch.load(CHECKPOINT_PATH, map_location=map_location))
+    model.module.load_state_dict(
+        torch.load(CHECKPOINT_PATH + f"_{fold}", map_location=map_location))
 
     return model
 

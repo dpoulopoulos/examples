@@ -14,9 +14,6 @@ class ResNext(nn.Module):
         n_features = self.model.fc.in_features
         self.model.fc = nn.Linear(n_features, target_size)
 
-    def unfreeze(self):
-        for param in self.model.parameters():
-            param.requires_grad = True
-
-    def forward(self, x):
-        return self.model(x)
+    @property
+    def architecture(self):
+        return self.model
