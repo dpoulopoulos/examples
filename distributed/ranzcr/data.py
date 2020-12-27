@@ -7,7 +7,7 @@ import torchvision.transforms as transforms
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.distributed import DistributedSampler
-from sklearn.model_selection import GroupKFold
+from sklearn.model_selection import GroupShuffleSplit
 
 
 TRAIN_PATH    = Path("data/train")
@@ -46,19 +46,14 @@ class RanzcrDataset(Dataset):
         return image, label
 
 
-def get_data(args, df, fold, rank):
-    trn_idx = df[df['Fold'] != fold].index
-    val_idx = df[df['Fold'] == fold].index
-    train_folds = df.loc[trn_idx].reset_index(drop=True)
-    valid_folds = df.loc[val_idx].reset_index(drop=True)
-
+def get_data(args, train_df, valid_df, rank):
     _transforms = transforms.Compose([transforms.RandomResizedCrop(args.image_size),
                                       transforms.ToTensor(),
                                       transforms.Normalize((0.1307,), (0.3081,))
                                     ])
 
-    train_dataset = RanzcrDataset(train_folds, tfms=_transforms)
-    valid_dataset = RanzcrDataset(valid_folds, tfms=_transforms)
+    train_dataset = RanzcrDataset(train_df, tfms=_transforms)
+    valid_dataset = RanzcrDataset(valid_df, tfms=_transforms)
 
     train_sampler = DistributedSampler(train_dataset, 
                                        num_replicas=args.world_size,
@@ -79,7 +74,7 @@ def get_data(args, df, fold, rank):
 
 
 def get_test_data():
-    test_df = pd.read_csv(TEST_DF_PATH).head()
+    test_df = pd.read_csv(TEST_DF_PATH)
     
     _transforms = transforms.Compose([transforms.RandomResizedCrop(512),
                                       transforms.ToTensor(),
@@ -93,14 +88,15 @@ def get_test_data():
     return test_loader
 
 
-def split_data(folds):
-    folds_df = pd.read_csv(TRAIN_DF_PATH)
-    groups = folds_df['PatientID'].values
+def split_data(train_size=.8):
+    train_df = pd.read_csv(TRAIN_DF_PATH)
+    groups = train_df['PatientID'].values
+    
+    gss = GroupShuffleSplit(n_splits=2, train_size=train_size, random_state=1)
 
-    for n, (train_index, val_index) in enumerate(GroupKFold(folds).split(folds_df, folds_df[TARGET_COLS], groups)):
-        folds_df.loc[val_index, 'Fold'] = int(n)
+    for train_idx, test_idx in gss.split(train_df, groups=groups):
+        train = train_df.loc[train_idx].reset_index(drop=True)
+        valid = train_df.loc[test_idx].reset_index(drop=True)
 
-    folds_df['Fold'] = folds_df['Fold'].astype("int")
-
-    return folds_df
+    return train, valid
     

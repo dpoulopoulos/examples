@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from torch.nn.parallel import DistributedDataParallel as DDP
 from tensorboardX import SummaryWriter
 
-from net import ResNext
+from net import create_model
 from data import split_data, get_data, get_test_data
 from utils import setup, cleanup, checkpoint, get_score
 
@@ -23,13 +23,17 @@ def train(gpu: int, args: Namespace):
         gpu: the GPU device
         args: user defined arguments
     """
+    
+    # global variables for evaluation
+    losses = []
+    scores = []
 
     # setup process groups
     rank = args.nr * args.gpus + gpu
     setup(rank, args)
     
     # define the model
-    model = ResNext().architecture
+    model = create_model(freeze=False)
     model.cuda(gpu)
     # Wrap the model
     model = DDP(model, device_ids=[gpu])
@@ -39,33 +43,30 @@ def train(gpu: int, args: Namespace):
     optimizer = Adam(model.parameters(), args.lr)
 
     # split data
-    train_df = split_data(args.folds)
+    train_df, valid_df = split_data(args.train_size)
+    train_loader, valid_loader = get_data(args, train_df, valid_df, rank)
 
-    for fold in range(args.folds):
-        losses = []
-        scores = []
-        train_loader, valid_loader = get_data(args, train_df, fold, rank)
-        
-        if gpu == 0:
-            print(f"Training started using fold {fold} for validation") 
-        
-        # train
-        model.train()
-        for epoch in range(args.epochs):
-            for i, (images, labels) in enumerate(train_loader):
-                images = images.cuda(gpu)
-                labels = labels.cuda(gpu)
-                output = model(images)
-                loss = criterion(output, labels)
-                loss.backward()
-                optimizer.step()
-                optimizer.zero_grad()
+    if gpu == 0:
+        print(f"Training started") 
 
-                if i % args.log_interval == 0 and gpu == 0:
-                    print("Train Epoch: {} [{}/{} ({:.0f}%)]\tloss={:.4f}".format(
-                          epoch+1, i, len(train_loader),
-                          100. * i / len(train_loader), loss.item()))
+    # train
+    model.train()
+    for epoch in range(args.epochs):
+        for i, (images, labels) in enumerate(train_loader):
+            images = images.cuda(gpu)
+            labels = labels.cuda(gpu)
+            output = model(images)
+            loss = criterion(output, labels)
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+
+            if i % args.log_interval == 0 and gpu == 0:
+                print("Train Epoch: {} [{}/{} ({:.0f}%)]\tloss={:.4f}".format(
+                      epoch+1, i, len(train_loader),
+                      100. * i / len(train_loader), loss.item()))
         
+
         # evaluate
         model.eval()
         with torch.no_grad():
@@ -83,7 +84,7 @@ def train(gpu: int, args: Namespace):
                       statistics.mean(losses), statistics.mean(scores)))
                 
         # checkpoint model
-        model = checkpoint(model, gpu, fold)
+        model = checkpoint(model, gpu, epoch)
             
     if args.save_model and gpu == 0:
         torch.save(model.module.state_dict(), "model.pt")
@@ -96,7 +97,7 @@ def test(model_path):
     
     test_loader = get_test_data()
     
-    model = ResNext().architecture
+    model = create_model()
     model.cuda()
     model.load_state_dict(torch.load(model_path))
     model.eval()

@@ -1,7 +1,9 @@
 
 # ignore data and logs 
 **/data
+**/*.csv
 **/logs
+**/.log
 
 # Python
 **/__pycache__
@@ -15,7 +17,8 @@
 
 # PyTorch
 **/*.pt
+**/*.pth
 **/*.checkpoint
 
-# Logs
-*.log
+# scripts
+**/*.sh
