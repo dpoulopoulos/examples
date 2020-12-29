@@ -33,7 +33,7 @@ def train(gpu: int, args: Namespace):
     setup(rank, args)
     
     # define the model
-    model = create_model(freeze=False)
+    model = create_model(freeze=True)
     model.cuda(gpu)
     # Wrap the model
     model = DDP(model, device_ids=[gpu])
@@ -43,7 +43,7 @@ def train(gpu: int, args: Namespace):
     optimizer = Adam(model.parameters(), args.lr)
 
     # split data
-    train_df, valid_df = split_data(args.train_size)
+    train_df, valid_df = split_data(args.train_size, .1)
     train_loader, valid_loader = get_data(args, train_df, valid_df, rank)
 
     if gpu == 0:

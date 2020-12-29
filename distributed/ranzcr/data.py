@@ -88,15 +88,20 @@ def get_test_data():
     return test_loader
 
 
-def split_data(train_size=.8):
+def split_data(train_size=.8, sample=None):
     train_df = pd.read_csv(TRAIN_DF_PATH)
     groups = train_df['PatientID'].values
     
-    gss = GroupShuffleSplit(n_splits=2, train_size=train_size, random_state=1)
+    gss = GroupShuffleSplit(n_splits=1, train_size=train_size, random_state=1)
 
     for train_idx, test_idx in gss.split(train_df, groups=groups):
         train = train_df.loc[train_idx].reset_index(drop=True)
         valid = train_df.loc[test_idx].reset_index(drop=True)
+        
+    if sample:
+        train = train.sample(frac=sample)
+        valid = valid.sample(frac=sample)
 
     return train, valid
+
     

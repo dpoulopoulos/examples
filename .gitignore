@@ -18,6 +18,7 @@
 # PyTorch
 **/*.pt
 **/*.pth
+**/model_archive
 **/*.checkpoint
 
 # scripts
