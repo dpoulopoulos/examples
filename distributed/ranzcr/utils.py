@@ -27,6 +27,10 @@ def setup(rank: int, args: Namespace):
                             init_method='env://', 
                             rank=rank, 
                             world_size=args.world_size)
+    
+    
+def cleanup():
+    dist.destroy_process_group()
 
 
 def checkpoint(model: nn.Module, gpu: int, epoch: int):

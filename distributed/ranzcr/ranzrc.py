@@ -44,7 +44,7 @@ def main():
                         help='number of gpus per node (default: 1)')
         parser.add_argument('--backend', type=str, help='distributed backend',
                             choices=[dist.Backend.GLOO, dist.Backend.NCCL],
-                            default=dist.Backend.GLOO)
+                            default=dist.Backend.NCCL)
         parser.add_argument('--host', type=str, default="localhost",
                         help='master address')
         parser.add_argument('--port', type=str, default="5000",

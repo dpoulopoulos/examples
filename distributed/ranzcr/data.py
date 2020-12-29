@@ -65,7 +65,7 @@ def load_data(frac: float = None) -> pd.DataFrame:
     Returns:
         data_df: the dataset as a pandas DataFrame
     """
-    data_df = pd.read_csv(DATA_PATH)
+    data_df = pd.read_csv(TRAIN_DF_PATH)
 
     if frac:
         return data_df.sample(frac=frac)
@@ -90,8 +90,8 @@ def split_data(df: pd.DataFrame,
     train_df = pd.DataFrame()
     valid_df = pd.DataFrame()
     for train_idx, test_idx in gss.split(df, groups=groups):
-        train_df = df.loc[train_idx].reset_index(drop=True)
-        valid_df = df.loc[test_idx].reset_index(drop=True)
+        train_df = df.iloc[train_idx].reset_index(drop=True)
+        valid_df = df.iloc[test_idx].reset_index(drop=True)
         
     return train_df, valid_df
 
@@ -139,12 +139,12 @@ def create_loaders(train_df: pd.DataFrame,
                                        rank=rank)
 
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size,
-                                  shuffle=False, num_workers=0,
-                                  pin_memory=False, sampler=train_sampler)
+                                  shuffle=False, num_workers=8,
+                                  pin_memory=True, sampler=train_sampler)
 
     valid_dataloader = DataLoader(valid_dataset, batch_size=args.batch_size,
-                                  shuffle=False, num_workers=0,
-                                  pin_memory=False, sampler=valid_sampler)
+                                  shuffle=False, num_workers=8,
+                                  pin_memory=True, sampler=valid_sampler)
     
     return train_dataloader, valid_dataloader
 

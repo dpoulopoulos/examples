@@ -1,16 +1,19 @@
+import time
 import statistics
+
 from argparse import Namespace
 
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.distributed as dist
 
 from torch.optim import Adam
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 from net import create_model
-from data import split_data, create_loaders, get_test_data
-from utils import setup, cleanup, checkpoint, get_score, load_data
+from data import load_data, split_data, create_loaders, create_test_loaders
+from utils import setup, cleanup, checkpoint, get_score
 
 
 def train(gpu: int,args: Namespace):
@@ -40,12 +43,13 @@ def train(gpu: int,args: Namespace):
     optimizer = Adam(model.parameters(), args.lr)
 
     # split data
-    data_df = load_data(frac=.1)
+    data_df = load_data(frac=.2)
     train_df, valid_df = split_data(data_df, args.train_size)
     train_loader, valid_loader = create_loaders(train_df, valid_df, rank, args) 
 
     if gpu == 0:
-        print(f"Training started") 
+        print("Training started")
+        print(f"Training set: {len(train_loader)}\tValidation set: {len(valid_loader)}")
 
     # train
     model.train()
@@ -63,8 +67,7 @@ def train(gpu: int,args: Namespace):
                 print("Train Epoch: {} [{}/{} ({:.0f}%)]\tloss={:.4f}".format(
                       epoch+1, i, len(train_loader),
                       100. * i / len(train_loader), loss.item()))
-        
-
+            
         # evaluate
         model.eval()
         with torch.no_grad():
