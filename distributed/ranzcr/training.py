@@ -4,19 +4,16 @@ from argparse import Namespace
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.distributed as dist
 
 from torch.optim import Adam
-from torch.utils.data import DataLoader
 from torch.nn.parallel import DistributedDataParallel as DDP
-from tensorboardX import SummaryWriter
 
 from net import create_model
-from data import split_data, get_data, get_test_data
-from utils import setup, cleanup, checkpoint, get_score
+from data import split_data, create_loaders, get_test_data
+from utils import setup, cleanup, checkpoint, get_score, load_data
 
 
-def train(gpu: int, args: Namespace):
+def train(gpu: int,args: Namespace):
     """Implements the training loop for PyTorch a model.
 
     Args:
@@ -33,7 +30,7 @@ def train(gpu: int, args: Namespace):
     setup(rank, args)
     
     # define the model
-    model = create_model(freeze=True)
+    model = create_model()
     model.cuda(gpu)
     # Wrap the model
     model = DDP(model, device_ids=[gpu])
@@ -43,8 +40,9 @@ def train(gpu: int, args: Namespace):
     optimizer = Adam(model.parameters(), args.lr)
 
     # split data
-    train_df, valid_df = split_data(args.train_size, .1)
-    train_loader, valid_loader = get_data(args, train_df, valid_df, rank)
+    data_df = load_data(frac=.1)
+    train_df, valid_df = split_data(data_df, args.train_size)
+    train_loader, valid_loader = create_loaders(train_df, valid_df, rank, args) 
 
     if gpu == 0:
         print(f"Training started") 

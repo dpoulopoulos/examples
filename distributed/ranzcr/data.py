@@ -1,4 +1,6 @@
+from argparse import Namespace
 from pathlib import Path
+from typing import Tuple
 
 import pandas as pd
 import torch
@@ -10,10 +12,10 @@ from torch.utils.data.distributed import DistributedSampler
 from sklearn.model_selection import GroupShuffleSplit
 
 
-TRAIN_PATH    = Path("data/train")
+DATA_PATH     = Path("data/train")
 TEST_PATH     = Path("data/test")
-TRAIN_DF_PATH = Path("data/train.csv")
 TEST_DF_PATH  = Path("data/sample_submission.csv")
+TRAIN_DF_PATH = Path("data/train.csv")
 
 TARGET_COLS = ['ETT - Abnormal', 'ETT - Borderline', 'ETT - Normal',
                'NGT - Abnormal', 'NGT - Borderline', 'NGT - Incompletely Imaged', 'NGT - Normal', 
@@ -22,7 +24,16 @@ TARGET_COLS = ['ETT - Abnormal', 'ETT - Borderline', 'ETT - Normal',
 
 
 class RanzcrDataset(Dataset):
-    def __init__(self, df, dataset="train", tfms=None):
+    def __init__(self, df: pd.DataFrame,
+                dataset: str = "train",
+                tfms: transforms.Compose = None):
+        """Creates an RANZCR dataset.
+    
+        Args:
+            df: the dataset as a pandas DataFrame
+            dataset: train or test split
+            tfms: a composition of image transforms
+        """
         self.df = df
         self.dataset = dataset
         self.file_names = self.df['StudyInstanceUID'].values
@@ -35,7 +46,7 @@ class RanzcrDataset(Dataset):
     def __getitem__(self, i):
         file_name = self.file_names[i]
         if self.dataset == "train":
-            file_path = f"{TRAIN_PATH}/{file_name}.jpg"
+            file_path = f"{DATA_PATH}/{file_name}.jpg"
         else:
             file_path = f"{TEST_PATH}/{file_name}.jpg"
         image = Image.open(file_path)
@@ -46,11 +57,76 @@ class RanzcrDataset(Dataset):
         return image, label
 
 
-def get_data(args, train_df, valid_df, rank):
-    _transforms = transforms.Compose([transforms.RandomResizedCrop(args.image_size),
-                                      transforms.ToTensor(),
-                                      transforms.Normalize((0.1307,), (0.3081,))
-                                    ])
+def load_data(frac: float = None) -> pd.DataFrame:
+    """Loads the dataset in memory.
+    
+    Args:
+        frac: if set returns a sample of the whole dataset
+    Returns:
+        data_df: the dataset as a pandas DataFrame
+    """
+    data_df = pd.read_csv(DATA_PATH)
+
+    if frac:
+        return data_df.sample(frac=frac)
+
+    return data_df
+
+
+def split_data(df: pd.DataFrame, 
+               train_size: float = .8) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Splits the dataset into train/valid.
+    
+    Args:
+        df: the dataset as a pandas DataFrame
+        train_size: the fraction of the train set size
+    Returns:
+        train_df: the train dataset as a pandas DataFrame
+        valid_df: the valid dataset as a pandas DataFrame
+    """
+    groups = df['PatientID'].values
+    gss = GroupShuffleSplit(n_splits=1, train_size=train_size, random_state=1)
+
+    train_df = pd.DataFrame()
+    valid_df = pd.DataFrame()
+    for train_idx, test_idx in gss.split(df, groups=groups):
+        train_df = df.loc[train_idx].reset_index(drop=True)
+        valid_df = df.loc[test_idx].reset_index(drop=True)
+        
+    return train_df, valid_df
+
+
+def get_transforms(image_size: int) -> transforms.Compose:
+    """Creates a composition of image transformation functions.
+    
+    Args:
+        image_size: the size of the image (hxw)
+    Returns:
+        tfms: a composition of image transforms
+    """
+    tfms = transforms.Compose([transforms.RandomResizedCrop(image_size),
+                               transforms.ToTensor(),
+                               transforms.Normalize((0.1307), (0.3081))
+                             ])
+    return tfms
+
+
+def create_loaders(train_df: pd.DataFrame, 
+                   valid_df: pd.DataFrame, 
+                   rank: int, 
+                   args: Namespace) -> Tuple[DataLoader, DataLoader]:
+    """Creates the train/valid dataloaders.
+    
+    Args:
+        train_df: the training dataset as a pandas DataFrame
+        valid_df: the validation dataset as a pandas DataFrame
+        rank: a unique identifier for the process
+        args: user defined arguments
+    Returns:
+        train_dataloader: the train dataloader
+        valid_dataloader: the valid dataloader
+    """
+    _transforms = get_transforms(args.image_size)
 
     train_dataset = RanzcrDataset(train_df, tfms=_transforms)
     valid_dataset = RanzcrDataset(valid_df, tfms=_transforms)
@@ -73,35 +149,20 @@ def get_data(args, train_df, valid_df, rank):
     return train_dataloader, valid_dataloader
 
 
-def get_test_data():
+def create_test_loaders(image_size: int) -> DataLoader:
+    """Creates the test data loader.
+    
+    Args:
+        image_size: the size of the image (hxw)
+    Returns:
+        test_loader: the test dataloader
+    """
     test_df = pd.read_csv(TEST_DF_PATH)
     
-    _transforms = transforms.Compose([transforms.RandomResizedCrop(512),
-                                      transforms.ToTensor(),
-                                      transforms.Normalize((0.1307,), (0.3081,))
-                                    ])
+    _transforms = get_transforms(image_size)
 
     test_dataset = RanzcrDataset(test_df, "test", tfms=_transforms)
     test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False, 
                              num_workers=4, pin_memory=True)
     
     return test_loader
-
-
-def split_data(train_size=.8, sample=None):
-    train_df = pd.read_csv(TRAIN_DF_PATH)
-    groups = train_df['PatientID'].values
-    
-    gss = GroupShuffleSplit(n_splits=1, train_size=train_size, random_state=1)
-
-    for train_idx, test_idx in gss.split(train_df, groups=groups):
-        train = train_df.loc[train_idx].reset_index(drop=True)
-        valid = train_df.loc[test_idx].reset_index(drop=True)
-        
-    if sample:
-        train = train.sample(frac=sample)
-        valid = valid.sample(frac=sample)
-
-    return train, valid
-
-    
