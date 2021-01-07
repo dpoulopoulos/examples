@@ -57,8 +57,6 @@ def checkpoint(model: nn.Module, gpu: int, epoch: int):
     model.module.load_state_dict(
         torch.load(CHECKPOINT_PATH + f"_{epoch}.pt", map_location=map_location))
 
-    return model
-
 
 def get_score(labels: torch.Tensor, predictions: torch.Tensor) -> float:
     """Calculates the AUC score.

@@ -21,10 +21,16 @@ def main():
                         help='number of epochs to train (default: 10)')
     parser.add_argument('--lr', type=float, default=0.003,
                         help='learning rate (default: 0.01)')
+    parser.add_argument('--weight-decay', type=float, default=0.,
+                        help='l2 regularization (default: 0)')
     parser.add_argument('--train-size', type=int, default=.8,
                         help='training set split (default: 0.8)')
     parser.add_argument('--image-size', type=int, default=224,
                         help='the size of the image (default: 224)')
+    parser.add_argument('--sample', type=float, default=None,
+                        help='load a dataset sample (default: 100%)')
+    parser.add_argument('--fine-tune', type=bool, default=False,
+                        help='whether you want to fine tune an existing model (default: False)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training (default False)')
     parser.add_argument('--seed', type=int, default=1,
