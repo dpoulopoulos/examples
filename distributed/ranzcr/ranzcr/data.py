@@ -112,19 +112,17 @@ def get_transforms(image_size: int) -> transforms.Compose:
 
 
 def create_loaders(train_df: pd.DataFrame, 
-                   valid_df: pd.DataFrame, 
-                   rank: int, 
+                   valid_df: pd.DataFrame,
                    args: Namespace) -> Tuple[DataLoader, DataLoader]:
     """Creates the train/valid dataloaders.
     
     Args:
         train_df: the training dataset as a pandas DataFrame
         valid_df: the validation dataset as a pandas DataFrame
-        rank: a unique identifier for the process
         args: user defined arguments
     Returns:
-        train_dataloader: the train dataloader
-        valid_dataloader: the valid dataloader
+        train_loader: the train dataloader
+        valid_loader: the valid dataloader
     """
     _transforms = get_transforms(args.image_size)
 
@@ -133,20 +131,20 @@ def create_loaders(train_df: pd.DataFrame,
 
     train_sampler = DistributedSampler(train_dataset, 
                                        num_replicas=args.world_size,
-                                       rank=rank)
+                                       rank=args.rank)
     valid_sampler = DistributedSampler(valid_dataset, 
                                        num_replicas=args.world_size,
-                                       rank=rank)
+                                       rank=args.rank)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size,
-                                  shuffle=False, num_workers=8,
-                                  pin_memory=True, sampler=train_sampler)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size,
+                                  num_workers=4, pin_memory=True, 
+                                  sampler=train_sampler)
 
-    valid_dataloader = DataLoader(valid_dataset, batch_size=args.batch_size,
-                                  shuffle=False, num_workers=8,
-                                  pin_memory=True, sampler=valid_sampler)
+    valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size,
+                                  num_workers=4, pin_memory=True, 
+                                  sampler=valid_sampler)
     
-    return train_dataloader, valid_dataloader
+    return train_loader, valid_loader
 
 
 def create_test_loaders(image_size: int) -> DataLoader:
