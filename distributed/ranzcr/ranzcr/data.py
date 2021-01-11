@@ -12,10 +12,10 @@ from torch.utils.data.distributed import DistributedSampler
 from sklearn.model_selection import GroupShuffleSplit
 
 
-DATA_PATH     = Path("data/train")
-TEST_PATH     = Path("data/test")
-TEST_DF_PATH  = Path("data/sample_submission.csv")
-TRAIN_DF_PATH = Path("data/train.csv")
+DATA_PATH     = Path("/opt/ranzcr/data/train")
+TEST_PATH     = Path("/opt/ranzcr/data/test")
+TEST_DF_PATH  = Path("/opt/ranzcr/data/sample_submission.csv")
+TRAIN_DF_PATH = Path("/opt/ranzcr/data/train.csv")
 
 TARGET_COLS = ['ETT - Abnormal', 'ETT - Borderline', 'ETT - Normal',
                'NGT - Abnormal', 'NGT - Borderline', 'NGT - Incompletely Imaged', 'NGT - Normal', 
@@ -137,11 +137,11 @@ def create_loaders(train_df: pd.DataFrame,
                                        rank=args.rank)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size,
-                                  num_workers=4, pin_memory=True, 
+                                  num_workers=1, pin_memory=False, 
                                   sampler=train_sampler)
 
     valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size,
-                                  num_workers=4, pin_memory=True, 
+                                  num_workers=1, pin_memory=False, 
                                   sampler=valid_sampler)
     
     return train_loader, valid_loader

@@ -1,19 +1,9 @@
-import time
 import statistics
 
-from argparse import Namespace
-
-import numpy as np
 import torch
-import torch.nn as nn
-import torch.distributed as dist
+import torch.nn.functional as F
 
-from torch.optim import Adam
-from torch.nn.parallel import DistributedDataParallel as DDP
-
-from net import create_model
-from data import load_data, split_data, create_loaders, create_test_loaders
-from utils import setup, cleanup, checkpoint, get_score
+from utils import get_score
 
 
 def train(args, model, device, train_loader, valid_loader, optimizer, epoch, writer):
@@ -30,7 +20,7 @@ def train(args, model, device, train_loader, valid_loader, optimizer, epoch, wri
         
         if i % args.log_interval == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tloss = {:.4f}'.format(
-                  epoch, i * len(data), len(train_loader),
+                  epoch, i, len(train_loader),
                   100. * i / len(train_loader), loss.item()))
             niter = epoch * len(train_loader) + i
             writer.add_scalar('loss', loss.item(), niter)
@@ -41,7 +31,7 @@ def train(args, model, device, train_loader, valid_loader, optimizer, epoch, wri
             data, target = data.to(device), target.to(device)
             output = model(data)
             loss = F.binary_cross_entropy_with_logits(output, target)
-            score = get_score(labels.detach().cpu(), output.detach().cpu())
+            score = get_score(target.detach().cpu(), output.detach().cpu())
             scores.append(score)
             
         print('Train Epoch: {}\tScore = {:.4f}'.format(

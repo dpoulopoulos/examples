@@ -1,16 +1,16 @@
-import os
 import logging
 import argparse
 
 import torch
+import torch.nn as nn
+import torch.optim as optim
 import torch.distributed as dist
-import torch.multiprocessing as mp
 
 from tensorboardX import SummaryWriter
 
 from training import train
 from net import create_model
-from utils import should_distribute
+from utils import should_distribute, is_distributed
 from data import load_data, split_data, create_loaders
 
 
@@ -87,7 +87,7 @@ def main():
                            weight_decay=args.weight_decay)
 
     for epoch in range(1, args.epochs + 1):
-        train(args, model, device, train_loader, optimizer, epoch, writer)
+        train(args, model, device, train_loader, valid_loader, optimizer, epoch, writer)
 
     if (args.save_model):
         torch.save(model.state_dict(), "ranzcr_model.pt")

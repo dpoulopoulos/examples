@@ -14,6 +14,10 @@ def should_distribute():
     return dist.is_available() and WORLD_SIZE > 1
 
 
+def is_distributed():
+    return dist.is_available() and dist.is_initialized()
+
+
 def get_score(labels: torch.Tensor, predictions: torch.Tensor) -> float:
     """Calculates the AUC score.
 
