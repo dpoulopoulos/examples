@@ -6,20 +6,19 @@ import torch.distributed as dist
 from sklearn.metrics import roc_auc_score
 
 
-WORLD_SIZE      = int(os.environ.get('WORLD_SIZE', 1))
-CHECKPOINT_PATH = "model.checkpoint"
+WORLD_SIZE = int(os.environ.get('WORLD_SIZE', 1))
 
 
-def should_distribute():
+def should_distribute() -> bool:
     return dist.is_available() and WORLD_SIZE > 1
 
 
-def is_distributed():
+def is_distributed() -> bool:
     return dist.is_available() and dist.is_initialized()
 
 
 def get_score(labels: torch.Tensor, predictions: torch.Tensor) -> float:
-    """Calculates the AUC score.
+    """Calculates the AUC score for each binary target variable.
 
     Args:
         labels: the ground truth

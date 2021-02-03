@@ -1,9 +1,10 @@
-from argparse import Namespace
+import argparse
+
 from pathlib import Path
 from typing import Tuple
 
-import pandas as pd
 import torch
+import pandas as pd
 import torchvision.transforms as transforms
 
 from PIL import Image
@@ -25,8 +26,8 @@ TARGET_COLS = ['ETT - Abnormal', 'ETT - Borderline', 'ETT - Normal',
 
 class RanzcrDataset(Dataset):
     def __init__(self, df: pd.DataFrame,
-                dataset: str = "train",
-                tfms: transforms.Compose = None):
+                 dataset: str = "train",
+                 tfms: transforms.Compose = None):
         """Creates an RANZCR dataset.
     
         Args:
@@ -113,7 +114,7 @@ def get_transforms(image_size: int) -> transforms.Compose:
 
 def create_loaders(train_df: pd.DataFrame, 
                    valid_df: pd.DataFrame,
-                   args: Namespace) -> Tuple[DataLoader, DataLoader]:
+                   args: argparse.Namespace) -> Tuple[DataLoader, DataLoader]:
     """Creates the train/valid dataloaders.
     
     Args:
@@ -137,30 +138,11 @@ def create_loaders(train_df: pd.DataFrame,
                                        rank=args.rank)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size,
-                                  num_workers=1, pin_memory=False, 
-                                  sampler=train_sampler)
+                              num_workers=args.workers, pin_memory=False, 
+                              sampler=train_sampler)
 
     valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size,
-                                  num_workers=1, pin_memory=False, 
-                                  sampler=valid_sampler)
+                              num_workers=args.workers, pin_memory=False, 
+                              sampler=valid_sampler)
     
     return train_loader, valid_loader
-
-
-def create_test_loaders(image_size: int) -> DataLoader:
-    """Creates the test data loader.
-    
-    Args:
-        image_size: the size of the image (hxw)
-    Returns:
-        test_loader: the test dataloader
-    """
-    test_df = pd.read_csv(TEST_DF_PATH)
-    
-    _transforms = get_transforms(image_size)
-
-    test_dataset = RanzcrDataset(test_df, "test", tfms=_transforms)
-    test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False, 
-                             num_workers=4, pin_memory=True)
-    
-    return test_loader

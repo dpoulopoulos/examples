@@ -18,7 +18,6 @@ logging.basicConfig(level=logging.INFO)
 
 
 def main():
-    # parse arguments
     parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
     
     parser.add_argument('--batch-size', type=int, default=32,
@@ -37,8 +36,10 @@ def main():
                         help='the size of the image (default: 224)')
     parser.add_argument('--sample', type=float, default=None,
                         help='load a dataset sample (default: 1.0)')
-    parser.add_argument('--no-cuda', action='store_true', default=False,
+    parser.add_argument('--no-cuda', type=bool, default=False,
                         help='disables CUDA training')
+    parser.add_argument('--workers', type=int, default=0,
+                        help='number of workers for the data loaders (default: 0)')
     parser.add_argument('--seed', type=int, default=1,
                         help='random seed (default: 1)')
     parser.add_argument('--log-interval', type=int, default=10,
@@ -54,43 +55,54 @@ def main():
         
     args = parser.parse_args()
     
+    torch.manual_seed(args.seed)
+
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     if use_cuda:
         logging.info('Using CUDA')
-
-    writer = SummaryWriter(args.dir)
-
-    torch.manual_seed(args.seed)
-
     device = torch.device('cuda' if use_cuda else 'cpu')
 
+    # instantiate the TensorBoard logger for PyTorch
+    writer = SummaryWriter(args.dir)
+    
     if should_distribute():
         logging.info('Using distributed PyTorch with {} backend'.format(args.backend))
         dist.init_process_group(backend=args.backend)
 
-    args.rank = dist.get_rank()
+    # number of processes
+    # usually equal to the number of GPUs available
     args.world_size = dist.get_world_size()
+    # the process identifier
+    # usually the GPU identifier (0, 1, ...)
+    args.rank = dist.get_rank()
     
+    # load the data
     df = load_data(args.sample)
     train_df, valid_df = split_data(df, args.train_size)
     train_loader, valid_loader = create_loaders(train_df, valid_df, args)
 
+    # instantiate the model
     model = create_model()
     model = model.to(device)
 
+    # wrap the model with a `Distributor` module
     if is_distributed():
         Distributor = nn.parallel.DistributedDataParallel if use_cuda \
             else nn.parallel.DistributedDataParallelCPU
         model = Distributor(model)
 
+    # set the optimizer and the cost function
     optimizer = optim.Adam(model.parameters(), lr=args.lr, 
                            weight_decay=args.weight_decay)
+    criterion = nn.BCEWithLogitsLoss()
 
+    # start the training loop
     for epoch in range(1, args.epochs + 1):
-        train(args, model, device, train_loader, valid_loader, optimizer, epoch, writer)
+        train(args, model, device, train_loader, valid_loader, 
+              optimizer, criterion, epoch, writer)
 
     if (args.save_model):
-        torch.save(model.state_dict(), "ranzcr_model.pt")
+        torch.save(model.state_dict(), "model.pt")
         
 if __name__ == '__main__':
     main()
