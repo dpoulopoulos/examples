@@ -14,7 +14,7 @@ from utils import should_distribute, is_distributed
 from data import load_data, split_data, create_loaders
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 
 def main():
@@ -42,7 +42,7 @@ def main():
                         help='number of workers for the data loaders (default: 0)')
     parser.add_argument('--seed', type=int, default=1,
                         help='random seed (default: 1)')
-    parser.add_argument('--log-interval', type=int, default=10,
+    parser.add_argument('--log-interval', type=int, default=2,
                         help='how many batches to wait before logging training status')
     parser.add_argument('--save-model', action='store_true', default=True,
                         help='save the current Model')
@@ -77,26 +77,31 @@ def main():
     args.rank = dist.get_rank()
     
     # load the data
+    logging.info("Loading data")
     df = load_data(args.sample)
     train_df, valid_df = split_data(df, args.train_size)
     train_loader, valid_loader = create_loaders(train_df, valid_df, args)
 
     # instantiate the model
+    logging.info("Instantiating the model")
     model = create_model()
     model = model.to(device)
 
     # wrap the model with a `Distributor` module
+    logging.info("Wraping the model")
     if is_distributed():
         Distributor = nn.parallel.DistributedDataParallel if use_cuda \
             else nn.parallel.DistributedDataParallelCPU
         model = Distributor(model)
 
     # set the optimizer and the cost function
+    logging.info("Setting the optimizer and the loss function")
     optimizer = optim.Adam(model.parameters(), lr=args.lr, 
                            weight_decay=args.weight_decay)
     criterion = nn.BCEWithLogitsLoss()
 
     # start the training loop
+    logging.info("Starting the training loop")
     for epoch in range(1, args.epochs + 1):
         train(args, model, device, train_loader, valid_loader, 
               optimizer, criterion, epoch, writer)

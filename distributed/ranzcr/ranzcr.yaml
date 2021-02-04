@@ -1,7 +1,7 @@
 apiVersion: "kubeflow.org/v1"
 kind: "PyTorchJob"
 metadata:
-  name: "pytorch-dist-mnist-nccl"
+  name: "pytorch-dist-ranzcr-nccl"
 spec:
   pytorchReplicaSpecs:
     Master:
@@ -14,8 +14,8 @@ spec:
         spec:
           containers:
             - name: pytorch
-              image: dimpo/ranzcr-dist:latest 
-              args: ["--epochs", "2", "--batch-size", "16", "--weight-decay", "0.1", "--image-size", "512", "--backend", "nccl"]
+              image: gcr.io/arrikto-playground/dimpo/ranzcr-dist:latest 
+              args: ["--epochs", "2", "--batch-size", "24", "--weight-decay", "0.1", "--image-size", "224", "--backend", "nccl"]
               resources: 
                 limits:
                   nvidia.com/gpu: 1
@@ -29,8 +29,8 @@ spec:
         spec:
           containers: 
             - name: pytorch
-              image: dimpo/ranzcr-dist:latest
-              args: ["--epochs", "2", "--batch-size", "24", "--weight-decay", "0.1", "--image-size", "512", "--backend", "nccl"]
+              image: gcr.io/arrikto-playground/dimpo/ranzcr-dist:latest
+              args: ["--epochs", "2", "--batch-size", "24", "--weight-decay", "0.1", "--image-size", "224", "--backend", "nccl"]
               resources: 
                 limits:
                   nvidia.com/gpu: 1

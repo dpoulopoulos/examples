@@ -14,9 +14,7 @@ from sklearn.model_selection import GroupShuffleSplit
 
 
 DATA_PATH     = Path("/opt/ranzcr/data/train")
-TEST_PATH     = Path("/opt/ranzcr/data/test")
-TEST_DF_PATH  = Path("/opt/ranzcr/data/sample_submission.csv")
-TRAIN_DF_PATH = Path("/opt/ranzcr/data/train.csv")
+TRAIN_DF_PATH = Path("/opt/ranzcr/data/sample.csv")
 
 TARGET_COLS = ['ETT - Abnormal', 'ETT - Borderline', 'ETT - Normal',
                'NGT - Abnormal', 'NGT - Borderline', 'NGT - Incompletely Imaged', 'NGT - Normal', 
@@ -26,7 +24,6 @@ TARGET_COLS = ['ETT - Abnormal', 'ETT - Borderline', 'ETT - Normal',
 
 class RanzcrDataset(Dataset):
     def __init__(self, df: pd.DataFrame,
-                 dataset: str = "train",
                  tfms: transforms.Compose = None):
         """Creates an RANZCR dataset.
     
@@ -34,9 +31,8 @@ class RanzcrDataset(Dataset):
             df: the dataset as a pandas DataFrame
             dataset: train or test split
             tfms: a composition of image transforms
-        """
+        """ 
         self.df = df
-        self.dataset = dataset
         self.file_names = self.df['StudyInstanceUID'].values
         self.labels = self.df[TARGET_COLS].values
         self.tfms = tfms
@@ -46,10 +42,7 @@ class RanzcrDataset(Dataset):
 
     def __getitem__(self, i):
         file_name = self.file_names[i]
-        if self.dataset == "train":
-            file_path = f"{DATA_PATH}/{file_name}.jpg"
-        else:
-            file_path = f"{TEST_PATH}/{file_name}.jpg"
+        file_path = f"{DATA_PATH}/{file_name}.jpg"
         image = Image.open(file_path)
         if self.tfms:
             augmented = self.tfms(image)
@@ -133,16 +126,16 @@ def create_loaders(train_df: pd.DataFrame,
     train_sampler = DistributedSampler(train_dataset, 
                                        num_replicas=args.world_size,
                                        rank=args.rank)
-    valid_sampler = DistributedSampler(valid_dataset, 
+    valid_sampler = DistributedSampler(valid_dataset,
                                        num_replicas=args.world_size,
                                        rank=args.rank)
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size,
-                              num_workers=args.workers, pin_memory=False, 
+                              num_workers=args.workers, pin_memory=True, 
                               sampler=train_sampler)
 
     valid_loader = DataLoader(valid_dataset, batch_size=args.batch_size,
-                              num_workers=args.workers, pin_memory=False, 
+                              num_workers=args.workers, pin_memory=True, 
                               sampler=valid_sampler)
     
     return train_loader, valid_loader
